@@ -8,17 +8,29 @@ defaults
     timeout client {{or (key "service/haproxy/timeouts/client") "50000ms"}}
     timeout server {{or (key "service/haproxy/timeouts/server") "50000ms"}}
 
+listen stats :8280
+    stats uri /
+    stats show-legends
+    stats refresh 10s
+    stats realm Haproxy\ Statistics
+    stats auth admin:1Qaz2wsx
+    stats admin if TRUE
+
+
 frontend www
     bind *:80
-
     # Generated automatically by consul-template
 {{ range services }}
     acl host_{{ .Name }} hdr(host) -i {{ .Name }}.{{ or (env "HAPROXY_DOMAIN") "haproxy.service.consul" }} 
     use_backend {{ .Name }}_backend if host_{{ .Name }}
 {{ end }}
+    use_backend haproxy if { hdr_beg(host) -i haproxy. }
 
 {{ range services }}
 backend {{ .Name }}_backend
 {{ range service .Name }}
    server {{ .Node }} {{ .Address }}:{{ .Port }}{{ end }}
 {{ end }}
+
+backend haproxy
+   server haproxy localhost:8280 check
